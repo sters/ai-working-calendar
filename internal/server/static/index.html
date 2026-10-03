@@ -1,11 +1,10 @@
 <!doctype html>
-<html lang="ja">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>AI Working Calendar</title>
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.21/index.global.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@fullcalendar/core@6.1.21/locales/ja.global.min.js"></script>
 <style>
   :root {
     --bg: #f7f7f5;
@@ -197,13 +196,13 @@
 <body>
 <aside>
   <h1>AI Working Calendar</h1>
-  <div class="seg" role="group" aria-label="表示単位">
-    <button type="button" data-mode="block">作業ブロック</button>
-    <button type="button" data-mode="active">稼働区間</button>
+  <div class="seg" role="group" aria-label="Display unit">
+    <button type="button" data-mode="block">Blocks</button>
+    <button type="button" data-mode="active">Active spans</button>
   </div>
-  <label class="toggle"><input type="checkbox" id="show-sdk"> SDK 実行も表示 <span class="count num" id="sdk-count"></span></label>
+  <label class="toggle"><input type="checkbox" id="show-sdk"> Show SDK runs <span class="count num" id="sdk-count"></span></label>
 
-  <h2>この期間</h2>
+  <h2>This period</h2>
   <div class="totals" id="totals"></div>
 
   <h2>Projects</h2>
@@ -215,19 +214,19 @@
   <header>
     <span class="title" id="viewer-title"></span>
     <span class="status" id="viewer-status"></span>
-    <select id="viewer-file" aria-label="ログファイル"></select>
-    <div class="seg" role="group" aria-label="表示形式">
-      <button type="button" data-format="pretty">整形</button>
+    <select id="viewer-file" aria-label="Log file"></select>
+    <div class="seg" role="group" aria-label="Format">
+      <button type="button" data-format="pretty">Pretty</button>
       <button type="button" data-format="raw">JSONL</button>
     </div>
-    <button type="button" id="viewer-fold">すべてたたむ</button>
-    <button type="button" id="viewer-close" aria-label="閉じる">閉じる</button>
+    <button type="button" id="viewer-fold">Fold all</button>
+    <button type="button" id="viewer-close" aria-label="Close">Close</button>
   </header>
   <div id="monaco"></div>
 </section>
 
 <section id="detail" hidden>
-  <button class="close" type="button" aria-label="閉じる">×</button>
+  <button class="close" type="button" aria-label="Close">×</button>
   <div id="detail-body"></div>
 </section>
 
@@ -285,7 +284,7 @@
 
   const shellQuote = (s) => "'" + s.replaceAll("'", `'\\''`) + "'";
   const usd = (v) => `$${(v ?? 0).toFixed(2)}`;
-  const int = (v) => (v ?? 0).toLocaleString("ja-JP");
+  const int = (v) => (v ?? 0).toLocaleString("en-US");
   function dur(ms) {
     if (!ms) return "0m";
     const m = Math.round(ms / 60000);
@@ -299,13 +298,13 @@
     if (n >= 1e3) return `${(n / 1e3).toFixed(1)}k`;
     return String(n);
   }
-  const est = (on) => (on ? h("span", { class: "est", text: "推定" }) : null);
+  const est = (on) => (on ? h("span", { class: "est", text: "estimated" }) : null);
   const dayKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   const sortedEntries = (m) => Object.entries(m ?? {}).sort((a, b) => b[1] - a[1]);
   const safeUrl = (u) => (/^https:\/\//.test(u) ? u : null);
 
-  const timeFmt = new Intl.DateTimeFormat("ja-JP", { month: "numeric", day: "numeric", weekday: "short", hour: "2-digit", minute: "2-digit" });
-  const hmFmt = new Intl.DateTimeFormat("ja-JP", { hour: "2-digit", minute: "2-digit" });
+  const timeFmt = new Intl.DateTimeFormat("en-US", { month: "numeric", day: "numeric", weekday: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+  const hmFmt = new Intl.DateTimeFormat("en-US", { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
 
   // Active intervals of the events, clipped to [from, to), as [start, end] in ms.
   function activeWithin(events, from, to) {
@@ -338,18 +337,18 @@
     return t;
   }
 
-  const ACTIVE_HINT = "Claude が動いていた時間の合計。並行して動いたセッションはそれぞれ数えます";
+  const ACTIVE_HINT = "Total time Claude was running. Sessions running in parallel are each counted";
 
   function renderTotals(events) {
     const t = sum(events, range.start.getTime(), range.end.getTime());
     const cell = (k, v, attrs) => h("div", attrs ?? {}, h("div", { class: "k", text: k }), v);
     document.getElementById("totals").replaceChildren(
-      cell("稼働", h("div", { class: "v num", text: hours(t.activeMs) }), { title: ACTIVE_HINT }),
-      cell("コスト", h("div", { class: "v num", text: usd(t.costUSD) }), { title: "API 料金換算" }),
-      cell("セッション", h("div", { class: "v num", text: int(t.sessions.size) })),
-      cell("プロンプト", h("div", { class: "v num", text: int(t.prompts) })),
-      cell("PR", h("div", { class: "v num", text: int(t.prs) })),
-      cell("変更行", [
+      cell("Active", h("div", { class: "v num", text: hours(t.activeMs) }), { title: ACTIVE_HINT }),
+      cell("Cost", h("div", { class: "v num", text: usd(t.costUSD) }), { title: "API-price equivalent" }),
+      cell("Sessions", h("div", { class: "v num", text: int(t.sessions.size) })),
+      cell("Prompts", h("div", { class: "v num", text: int(t.prompts) })),
+      cell("PRs", h("div", { class: "v num", text: int(t.prs) })),
+      cell("Changed lines", [
         h("div", { class: "v num add", text: `+${int(t.linesAdded)}` }),
         h("div", { class: "v num del", text: `−${int(t.linesRemoved)}` }),
       ]),
@@ -410,7 +409,7 @@
       const t = sum(evs, from.getTime(), to.getTime());
       // Blocks that started the day before can still run into this day.
       const active = sumMs(activeWithin(events, from.getTime(), to.getTime()));
-      const parts = [`稼働 ${hours(active)}`, usd(t.costUSD)];
+      const parts = [`Active ${hours(active)}`, usd(t.costUSD)];
       if (t.prs) parts.push(`PR ${t.prs}`);
       return {
         id: `summary-${day}`,
@@ -472,7 +471,7 @@
       };
       const script = document.createElement("script");
       script.src = `${MONACO_BASE}/vs/loader.js`;
-      script.onerror = () => { monacoReady = null; reject(new Error("Monaco を読み込めませんでした")); };
+      script.onerror = () => { monacoReady = null; reject(new Error("Failed to load Monaco")); };
       script.onload = () => {
         window.require.config({ paths: { vs: `${MONACO_BASE}/vs` } });
         window.require(["vs/editor/editor.main"], () => resolve(window.monaco), reject);
@@ -526,7 +525,7 @@
 
   async function renderLog() {
     formatButtons.forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.format === viewer.format)));
-    viewerStatus.textContent = "表示を準備中…";
+    viewerStatus.textContent = "Preparing…";
     const monaco = await loadMonaco();
     // Let the status paint before the synchronous layout work.
     await new Promise((r) => setTimeout(r, 0));
@@ -548,12 +547,12 @@
     editor.setModel(monaco.editor.createModel(value, "json"));
     editor.setPosition({ lineNumber: line, column: 1 });
     editor.revealLineNearTop(line);
-    viewerStatus.textContent = `${int(viewer.text.length)} 文字`;
+    viewerStatus.textContent = `${int(viewer.text.length)} chars`;
   }
 
   async function loadLog(file) {
     const { session } = viewer;
-    viewerStatus.textContent = "読み込み中…";
+    viewerStatus.textContent = "Loading…";
     try {
       const q = file ? `?${new URLSearchParams({ file })}` : "";
       const res = await fetch(`/api/sessions/${encodeURIComponent(session.id)}/log${q}`);
@@ -562,7 +561,7 @@
       viewer.format = viewer.text.length > PRETTY_MAX_BYTES ? "raw" : "pretty";
       await renderLog();
     } catch (err) {
-      viewerStatus.textContent = `読み込めませんでした: ${err.message}`;
+      viewerStatus.textContent = `Failed to load: ${err.message}`;
     }
   }
 
@@ -570,7 +569,7 @@
     viewer = { session, startAt, text: "", format: "pretty" };
     document.getElementById("viewer-title").textContent = title || session.id;
     viewerFile.replaceChildren(
-      h("option", { value: "", text: "セッション" }),
+      h("option", { value: "", text: "Session" }),
       ...(session.subagents ?? []).map((n) => h("option", { value: n, text: `subagent: ${n}` })));
     viewerFile.hidden = !session.subagents?.length;
     viewerEl.hidden = false;
@@ -600,7 +599,7 @@
     const rest = files.slice(FILES_SHOWN);
     return h("div", {},
       h("ul", { class: "files" }, head.map(li)),
-      rest.length ? h("details", {}, h("summary", { text: `ほか ${rest.length} 件` }), h("ul", { class: "files" }, rest.map(li))) : null);
+      rest.length ? h("details", {}, h("summary", { text: `${rest.length} more` }), h("ul", { class: "files" }, rest.map(li))) : null);
   }
 
   function lines(added, removed) {
@@ -611,7 +610,7 @@
     const rows = Object.entries(usage ?? {});
     if (!rows.length) return null;
     return h("div", { class: "table-wrap" }, h("table", { class: "usage num" },
-      h("thead", {}, h("tr", {}, ["モデル", "入力", "出力", "キャッシュ読込", "キャッシュ作成", "コスト"].map((c) => h("th", { text: c })))),
+      h("thead", {}, h("tr", {}, ["Model", "Input", "Output", "Cache read", "Cache write", "Cost"].map((c) => h("th", { text: c })))),
       h("tbody", {}, rows.map(([model, u]) => h("tr", {},
         h("td", { text: model }), h("td", { text: int(u.inputTokens) }), h("td", { text: int(u.outputTokens) }),
         h("td", { text: int(u.cacheReadInputTokens) }), h("td", { text: int(u.cacheCreationInputTokens) }),
@@ -625,59 +624,59 @@
     const row = (k, v) => [h("dt", { text: k }), h("dd", {}, v)];
     const cmd = (s.cwd ? `cd ${shellQuote(s.cwd)} && ` : "") + `claude --resume ${s.id}`;
     const copy = h("button", { type: "button", text: "Copy" });
-    const openLog = h("button", { type: "button", class: "open-log", text: "ログを開く（このブロックの位置から）" });
+    const openLog = h("button", { type: "button", class: "open-log", text: "Open log (at this block)" });
     openLog.addEventListener("click", () => openViewer(s, start, ev.title));
     copy.addEventListener("click", async () => {
       try { await navigator.clipboard.writeText(cmd); copy.textContent = "Copied"; } catch { copy.textContent = "Failed"; }
     });
 
     const blockRows = [
-      row("稼働", b.active?.length
-        ? h("span", {}, `${dur(b.activeMs)}（${b.active.length} 区間）`, est(b.activeEstimated))
-        : h("span", { class: "muted", text: "記録なし" })),
-      row("コスト", h("span", {}, usd(b.costUSD), est(s.costEstimated))),
-      b.tokens ? row("トークン", h("div", { class: "chips" }, Object.entries(b.tokens).map(([m, t]) =>
-        h("span", { class: "chip", title: `入力 ${int(t.input)} / 出力 ${int(t.output)} / キャッシュ読込 ${int(t.cacheRead)} / キャッシュ作成 ${int(t.cacheWrite5m + t.cacheWrite1h)}` },
-          m, h("span", { class: "n num", text: `出力 ${compact(t.output)} · 読込 ${compact(t.cacheRead)}` }))))) : null,
-      row("変更行", lines(b.linesAdded, b.linesRemoved)),
-      row("プロンプト", `${int(b.prompts)} / メッセージ ${int(b.messages)}`),
-      row("PR", prList(b.prs)),
-      row("モデル", chips(b.models)),
-      row("ツール", chips(b.tools)),
-      b.skills ? row("スキル", chips(b.skills)) : null,
+      row("Active", b.active?.length
+        ? h("span", {}, `${dur(b.activeMs)} (${b.active.length} ${b.active.length === 1 ? "span" : "spans"})`, est(b.activeEstimated))
+        : h("span", { class: "muted", text: "not recorded" })),
+      row("Cost", h("span", {}, usd(b.costUSD), est(s.costEstimated))),
+      b.tokens ? row("Tokens", h("div", { class: "chips" }, Object.entries(b.tokens).map(([m, t]) =>
+        h("span", { class: "chip", title: `Input ${int(t.input)} / Output ${int(t.output)} / Cache read ${int(t.cacheRead)} / Cache write ${int(t.cacheWrite5m + t.cacheWrite1h)}` },
+          m, h("span", { class: "n num", text: `out ${compact(t.output)} · read ${compact(t.cacheRead)}` }))))) : null,
+      row("Changed lines", lines(b.linesAdded, b.linesRemoved)),
+      row("Prompts", `${int(b.prompts)} / ${int(b.messages)} messages`),
+      row("PRs", prList(b.prs)),
+      row("Models", chips(b.models)),
+      row("Tools", chips(b.tools)),
+      b.skills ? row("Skills", chips(b.skills)) : null,
       b.mcp ? row("MCP", chips(b.mcp)) : null,
-      b.errors ? row("API エラー", String(b.errors)) : null,
-      row("編集ファイル", fileList(b.files, s.cwd)),
+      b.errors ? row("API errors", String(b.errors)) : null,
+      row("Edited files", fileList(b.files, s.cwd)),
     ];
     const sessionTotals = [
-      row("ブロック", String(s.blocks)),
-      row("稼働", dur(s.activeMs)),
-      row("コスト", h("span", {}, usd(s.costUSD), est(s.costEstimated))),
-      row("変更行", lines(s.linesAdded, s.linesRemoved)),
-      row("PR", prList(s.prs)),
+      row("Blocks", String(s.blocks)),
+      row("Active", dur(s.activeMs)),
+      row("Cost", h("span", {}, usd(s.costUSD), est(s.costEstimated))),
+      row("Changed lines", lines(s.linesAdded, s.linesRemoved)),
+      row("PRs", prList(s.prs)),
     ];
     const sessionMeta = [
       row("Project", s.cwd || "-"),
       row("Branch", s.branch || "-"),
-      row("起動元", s.entrypoint || "-"),
+      row("Entrypoint", s.entrypoint || "-"),
       row("Version", s.version || "-"),
-      row("Session", s.slug ? `${s.id}（${s.slug}）` : s.id),
-      row("ログ", h("span", { title: s.path, text: s.path ? s.path.replace(/^.*\/projects\//, "…/projects/") : "-" })),
+      row("Session", s.slug ? `${s.id} (${s.slug})` : s.id),
+      row("Log", h("span", { title: s.path, text: s.path ? s.path.replace(/^.*\/projects\//, "…/projects/") : "-" })),
     ];
     // A session that was not split into several blocks is the block itself,
     // so its totals would only repeat the block's figures.
     const split = s.blocks > 1;
-    if (!split) openLog.textContent = "ログを開く";
+    if (!split) openLog.textContent = "Open log";
 
     document.getElementById("detail-body").replaceChildren(
       h("h3", { text: ev.title || "(untitled)" }),
-      h("div", { class: "when", text: `${timeFmt.format(start)} – ${hmFmt.format(end)}（${dur(end - start)}）` }),
+      h("div", { class: "when", text: `${timeFmt.format(start)} – ${hmFmt.format(end)} (${dur(end - start)})` }),
       ...(split
         ? [
-          h("h4", { text: "このブロック" }), h("dl", {}, blockRows),
-          h("h4", { text: "セッション全体" }), h("dl", {}, sessionTotals, sessionMeta),
+          h("h4", { text: "This block" }), h("dl", {}, blockRows),
+          h("h4", { text: "Whole session" }), h("dl", {}, sessionTotals, sessionMeta),
         ]
-        : [h("h4", { text: "セッション" }), h("dl", {}, blockRows, sessionMeta)]),
+        : [h("h4", { text: "Session" }), h("dl", {}, blockRows, sessionMeta)]),
       usageTable(s.usage),
       h("div", { class: "cmd" }, h("code", { text: cmd }), copy),
       openLog,
@@ -706,7 +705,6 @@
   });
 
   const calendar = new FullCalendar.Calendar(document.getElementById("calendar"), {
-    locale: "ja",
     initialView: "timeGridWeek",
     headerToolbar: {
       left: "prev,next today",
@@ -716,7 +714,7 @@
     height: "100%",
     firstDay: 1,
     nowIndicator: true,
-    allDayText: "日計",
+    allDayText: "Daily",
     scrollTime: "08:00:00",
     slotDuration: "00:30:00",
     slotEventOverlap: false,
@@ -753,7 +751,7 @@
       info.el.title = [
         info.event.title,
         `${projectLabel(p.session.cwd)}${p.session.branch ? ` (${p.session.branch})` : ""}`,
-        `稼働 ${dur(b.activeMs)}${b.activeEstimated ? "（推定）" : ""} · ${usd(b.costUSD)} · プロンプト ${b.prompts}`,
+        `Active ${dur(b.activeMs)}${b.activeEstimated ? " (estimated)" : ""} · ${usd(b.costUSD)} · ${b.prompts} prompts`,
       ].join("\n");
     },
     eventClick: (info) => {

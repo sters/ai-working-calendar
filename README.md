@@ -6,6 +6,8 @@
 
 A localhost-only web tool that reads Claude Code session logs (`~/.claude/projects/*/*.jsonl`) and shows the time you spent working as a calendar.
 
+![Week view of AI Working Calendar](docs/screenshot.png)
+
 ## Install
 
 ```shell

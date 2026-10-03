@@ -12,6 +12,8 @@ A localhost-only web tool that reads Claude Code session logs (`~/.claude/projec
 go install github.com/sters/ai-working-calendar@latest
 ```
 
+or download from Releases.
+
 ## Usage
 
 ```shell

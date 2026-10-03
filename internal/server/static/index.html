@@ -1,0 +1,768 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Working Calendar</title>
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.21/index.global.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@fullcalendar/core@6.1.21/locales/ja.global.min.js"></script>
+<style>
+  :root {
+    --bg: #f7f7f5;
+    --panel: #ffffff;
+    --text: #1f2328;
+    --muted: #6b7280;
+    --line: #e5e5e2;
+    --chip: #f1f1ee;
+    --accent: #3b5bdb;
+    --add: #2f9e44;
+    --del: #e03131;
+    --fc-border-color: var(--line);
+    --fc-page-bg-color: var(--panel);
+    --fc-neutral-bg-color: #f1f1ee;
+    --fc-today-bg-color: #fff8e6;
+    --fc-now-indicator-color: #e03131;
+    --fc-button-bg-color: #ffffff;
+    --fc-button-border-color: var(--line);
+    --fc-button-text-color: var(--text);
+    --fc-button-hover-bg-color: #f1f1ee;
+    --fc-button-hover-border-color: var(--line);
+    --fc-button-active-bg-color: #e8ebfb;
+    --fc-button-active-border-color: #c5cdf5;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #17181a;
+      --panel: #1e1f22;
+      --text: #e6e6e3;
+      --muted: #9a9ca3;
+      --line: #2f3135;
+      --chip: #2a2c30;
+      --accent: #8ea2ff;
+      --add: #69db7c;
+      --del: #ff8787;
+      --fc-neutral-bg-color: #26282c;
+      --fc-today-bg-color: #2a2720;
+      --fc-button-bg-color: #26282c;
+      --fc-button-hover-bg-color: #2f3135;
+      --fc-button-active-bg-color: #2c3350;
+      --fc-button-active-border-color: #3d4675;
+      color-scheme: dark;
+    }
+  }
+  * { box-sizing: border-box; }
+  /* Elements toggled with the hidden attribute also set display, which would win over the browser default. */
+  [hidden] { display: none !important; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font: 13px/1.5 -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Segoe UI", sans-serif;
+    display: grid;
+    grid-template-columns: 250px 1fr;
+  }
+  a { color: var(--accent); }
+  .num { font-variant-numeric: tabular-nums; }
+  .muted { color: var(--muted); }
+  .add { color: var(--add); }
+  .del { color: var(--del); }
+
+  aside {
+    border-right: 1px solid var(--line);
+    padding: 16px 12px;
+    overflow-y: auto;
+  }
+  aside h1 { font-size: 14px; margin: 0 0 14px; }
+  aside h2 {
+    font-size: 11px; font-weight: 600; letter-spacing: .04em;
+    color: var(--muted); text-transform: uppercase; margin: 18px 0 8px;
+  }
+  .seg { display: flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; margin-bottom: 10px; }
+  .seg button {
+    flex: 1; border: 0; background: var(--panel); color: var(--text);
+    padding: 5px 0; font: inherit; cursor: pointer;
+  }
+  .seg button + button { border-left: 1px solid var(--line); }
+  .seg button[aria-pressed="true"] { background: var(--fc-button-active-bg-color); font-weight: 600; }
+  .toggle { display: flex; align-items: center; gap: 8px; padding: 0 2px; cursor: pointer; }
+  .toggle .count { margin-left: auto; color: var(--muted); }
+
+  .totals { display: grid; gap: 6px; }
+  .totals > div { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; min-width: 0; }
+  .totals .k { font-size: 11px; color: var(--muted); }
+  /* fitValues() lowers the size from here until the value fits the card. */
+  .totals .v { font-size: 18px; font-weight: 600; line-height: 1.3; white-space: nowrap; overflow: hidden; }
+  .est { color: var(--muted); font-size: 11px; font-weight: 400; margin-left: 4px; }
+
+  .projects { list-style: none; margin: 0; padding: 0; }
+  .projects li label {
+    display: flex; align-items: center; gap: 8px;
+    padding: 4px 6px; border-radius: 6px; cursor: pointer;
+  }
+  .projects li label:hover { background: var(--fc-neutral-bg-color); }
+  .projects input { display: none; }
+  .swatch { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+  .projects input:not(:checked) + .swatch { background: transparent !important; outline: 1.5px solid var(--muted); outline-offset: -1.5px; }
+  .projects input:not(:checked) ~ .name { color: var(--muted); text-decoration: line-through; }
+  .projects .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .projects .count { color: var(--muted); }
+
+  main { padding: 12px 16px; min-width: 0; height: 100vh; }
+  #calendar { height: 100%; }
+  .fc .fc-toolbar-title { font-size: 16px; font-weight: 600; }
+  .fc .fc-button { font-size: 12px; padding: 4px 10px; box-shadow: none !important; }
+  .fc .fc-timegrid-event { border-radius: 4px; }
+  .fc .fc-event-title { font-weight: 500; }
+  .fc-event { cursor: pointer; }
+  .fc .summary-event, .fc .summary-event:hover {
+    background: var(--chip) !important; border-color: var(--line) !important; cursor: default;
+  }
+  .fc .summary-event .fc-event-main { color: var(--text) !important; font-weight: 500; font-size: 11px; line-height: 1.35; padding: 1px 4px; white-space: normal; }
+  .fc .no-turns { background-image: repeating-linear-gradient(45deg, transparent 0 6px, rgb(255 255 255 / .18) 6px 12px); }
+
+  #detail {
+    position: fixed; top: 0; right: 0; bottom: 0; width: min(460px, 100vw);
+    background: var(--panel); border-left: 1px solid var(--line);
+    box-shadow: -8px 0 24px rgb(0 0 0 / .08);
+    padding: 20px; overflow-y: auto; z-index: 10;
+  }
+  #detail .close {
+    position: absolute; top: 14px; right: 14px; border: 0; background: none; color: var(--muted);
+    font-size: 18px; cursor: pointer; line-height: 1;
+  }
+  #detail h3 { font-size: 15px; margin: 0 28px 4px 0; }
+  #detail h4 {
+    font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+    color: var(--muted); margin: 18px 0 8px; padding-top: 12px; border-top: 1px solid var(--line);
+  }
+  #detail .when { color: var(--muted); }
+  #detail dl { display: grid; grid-template-columns: 96px 1fr; gap: 5px 12px; margin: 0; }
+  #detail dt { color: var(--muted); }
+  #detail dd { margin: 0; word-break: break-all; min-width: 0; }
+  .chips { display: flex; flex-wrap: wrap; gap: 4px; }
+  .chip { background: var(--chip); border-radius: 4px; padding: 1px 6px; font-size: 12px; }
+  .chip .n { color: var(--muted); margin-left: 4px; }
+  .files { margin: 0; padding-left: 16px; font: 12px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace; word-break: break-all; }
+  details summary { cursor: pointer; color: var(--muted); margin-top: 4px; }
+  .table-wrap { overflow-x: auto; margin-top: 12px; }
+  table.usage { width: 100%; border-collapse: collapse; font-size: 12px; }
+  table.usage th, table.usage td { text-align: right; padding: 3px 4px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  table.usage th:first-child, table.usage td:first-child { text-align: left; }
+  table.usage th { color: var(--muted); font-weight: 500; }
+  .cmd {
+    display: flex; gap: 8px; align-items: stretch; margin-top: 16px;
+    background: var(--chip); border-radius: 6px; padding: 8px;
+  }
+  .cmd code { flex: 1; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; word-break: break-all; }
+  .cmd button {
+    border: 1px solid var(--line); background: var(--panel); color: var(--text);
+    border-radius: 4px; padding: 0 10px; cursor: pointer; font-size: 12px;
+  }
+
+  .open-log {
+    margin-top: 12px; width: 100%; padding: 7px 0; border-radius: 6px; cursor: pointer;
+    border: 1px solid var(--line); background: var(--panel); color: var(--text); font: inherit;
+  }
+  .open-log:hover { background: var(--chip); }
+
+  #viewer {
+    position: fixed; inset: 0; z-index: 20; background: var(--panel);
+    display: flex; flex-direction: column;
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+  #viewer header {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+    padding: 8px 16px; border-bottom: 1px solid var(--line);
+  }
+  #viewer header .title { font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #viewer header .status { color: var(--muted); font-size: 12px; }
+  #viewer select, #viewer header button {
+    border: 1px solid var(--line); background: var(--panel); color: var(--text);
+    border-radius: 6px; padding: 4px 10px; font: inherit; cursor: pointer;
+  }
+  #viewer .seg { margin: 0; }
+  #viewer .seg button { padding: 4px 12px; border-radius: 0; border: 0; }
+  #viewer .seg button + button { border-left: 1px solid var(--line); }
+  #viewer .seg button[aria-pressed="true"] { background: var(--fc-button-active-bg-color); font-weight: 600; }
+  #viewer select { max-width: 280px; }
+  #monaco { flex: 1; min-height: 0; }
+
+  @media (max-width: 720px) {
+    body { grid-template-columns: 1fr; }
+    aside { display: none; }
+  }
+</style>
+</head>
+<body>
+<aside>
+  <h1>AI Working Calendar</h1>
+  <div class="seg" role="group" aria-label="表示単位">
+    <button type="button" data-mode="block">作業ブロック</button>
+    <button type="button" data-mode="active">稼働区間</button>
+  </div>
+  <label class="toggle"><input type="checkbox" id="show-sdk"> SDK 実行も表示 <span class="count num" id="sdk-count"></span></label>
+
+  <h2>この期間</h2>
+  <div class="totals" id="totals"></div>
+
+  <h2>Projects</h2>
+  <ul class="projects" id="projects"></ul>
+</aside>
+<main><div id="calendar"></div></main>
+
+<section id="viewer" hidden>
+  <header>
+    <span class="title" id="viewer-title"></span>
+    <span class="status" id="viewer-status"></span>
+    <select id="viewer-file" aria-label="ログファイル"></select>
+    <div class="seg" role="group" aria-label="表示形式">
+      <button type="button" data-format="pretty">整形</button>
+      <button type="button" data-format="raw">JSONL</button>
+    </div>
+    <button type="button" id="viewer-fold">すべてたたむ</button>
+    <button type="button" id="viewer-close" aria-label="閉じる">閉じる</button>
+  </header>
+  <div id="monaco"></div>
+</section>
+
+<section id="detail" hidden>
+  <button class="close" type="button" aria-label="閉じる">×</button>
+  <div id="detail-body"></div>
+</section>
+
+<script>
+(() => {
+  const HIDDEN_KEY = "hiddenProjects";
+  const SHOW_SDK_KEY = "showSdk";
+  const MODE_KEY = "mode";
+  const REFRESH_MS = 60_000;
+  const MIN_EVENT_MS = 5 * 60_000;
+  const FILES_SHOWN = 15;
+
+  const hidden = new Set(load(HIDDEN_KEY, []));
+  let showSdk = load(SHOW_SDK_KEY, false);
+  let mode = load(MODE_KEY, "block");
+  let lastEvents = [];
+  let range = { start: new Date(), end: new Date() };
+
+  function load(key, fallback) {
+    try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; }
+  }
+  function save(key, value) {
+    try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* storage unavailable */ }
+  }
+
+  function h(tag, props, ...children) {
+    const el = document.createElement(tag);
+    for (const [k, v] of Object.entries(props ?? {})) {
+      if (k === "class") el.className = v;
+      else if (k === "text") el.textContent = v;
+      else el.setAttribute(k, v);
+    }
+    el.append(...children.flat(Infinity).filter((c) => c !== null && c !== undefined && c !== false));
+    return el;
+  }
+
+  const isSdk = (e) => e.extendedProps.session.entrypoint === "sdk-cli";
+  const visible = () => lastEvents.filter((e) => (showSdk || !isSdk(e)) && !hidden.has(e.extendedProps.session.cwd));
+
+  function projectLabel(cwd) {
+    if (!cwd) return "(unknown)";
+    return cwd.split("/").filter(Boolean).slice(-2).join("/");
+  }
+
+  // FNV-1a with a final avalanche, so paths sharing a long prefix still land on distant hues.
+  function hue(s) {
+    let x = 0x811c9dc5;
+    for (const c of s) x = Math.imul(x ^ c.codePointAt(0), 0x01000193);
+    x ^= x >>> 16; x = Math.imul(x, 0x85ebca6b);
+    x ^= x >>> 13; x = Math.imul(x, 0xc2b2ae35);
+    x ^= x >>> 16;
+    return (x >>> 0) % 360;
+  }
+  const colorOf = (cwd) => `hsl(${hue(cwd || "")} 55% 48%)`;
+
+  const shellQuote = (s) => "'" + s.replaceAll("'", `'\\''`) + "'";
+  const usd = (v) => `$${(v ?? 0).toFixed(2)}`;
+  const int = (v) => (v ?? 0).toLocaleString("ja-JP");
+  function dur(ms) {
+    if (!ms) return "0m";
+    const m = Math.round(ms / 60000);
+    if (m < 1) return `${Math.round(ms / 1000)}s`;
+    if (m < 60) return `${m}m`;
+    return `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, "0")}m`;
+  }
+  const hours = (ms) => `${(ms / 3_600_000).toFixed(1)}h`;
+  function compact(n) {
+    if (n >= 1e6) return `${(n / 1e6).toFixed(1)}M`;
+    if (n >= 1e3) return `${(n / 1e3).toFixed(1)}k`;
+    return String(n);
+  }
+  const est = (on) => (on ? h("span", { class: "est", text: "推定" }) : null);
+  const dayKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const sortedEntries = (m) => Object.entries(m ?? {}).sort((a, b) => b[1] - a[1]);
+  const safeUrl = (u) => (/^https:\/\//.test(u) ? u : null);
+
+  const timeFmt = new Intl.DateTimeFormat("ja-JP", { month: "numeric", day: "numeric", weekday: "short", hour: "2-digit", minute: "2-digit" });
+  const hmFmt = new Intl.DateTimeFormat("ja-JP", { hour: "2-digit", minute: "2-digit" });
+
+  // Active intervals of the events, clipped to [from, to), as [start, end] in ms.
+  function activeWithin(events, from, to) {
+    const out = [];
+    for (const e of events) {
+      for (const iv of e.extendedProps.block.active ?? []) {
+        const s = Math.max(new Date(iv.start).getTime(), from);
+        const en = Math.min(new Date(iv.end).getTime(), to);
+        if (en > s) out.push([s, en]);
+      }
+    }
+    return out;
+  }
+  const sumMs = (ivs) => ivs.reduce((t, [s, e]) => t + (e - s), 0);
+
+  // Time is measured inside [from, to); cost, prompts, lines and PRs belong
+  // to the day their block starts.
+  function sum(events, from, to) {
+    const ivs = activeWithin(events, from, to);
+    const t = { sessions: new Set(), activeMs: sumMs(ivs), costUSD: 0, prompts: 0, linesAdded: 0, linesRemoved: 0, prs: 0 };
+    for (const e of events) {
+      const b = e.extendedProps.block;
+      t.sessions.add(e.extendedProps.session.id);
+      t.costUSD += b.costUSD;
+      t.prompts += b.prompts;
+      t.linesAdded += b.linesAdded;
+      t.linesRemoved += b.linesRemoved;
+      t.prs += b.prs?.length ?? 0;
+    }
+    return t;
+  }
+
+  const ACTIVE_HINT = "Claude が動いていた時間の合計。並行して動いたセッションはそれぞれ数えます";
+
+  function renderTotals(events) {
+    const t = sum(events, range.start.getTime(), range.end.getTime());
+    const cell = (k, v, attrs) => h("div", attrs ?? {}, h("div", { class: "k", text: k }), v);
+    document.getElementById("totals").replaceChildren(
+      cell("稼働", h("div", { class: "v num", text: hours(t.activeMs) }), { title: ACTIVE_HINT }),
+      cell("コスト", h("div", { class: "v num", text: usd(t.costUSD) }), { title: "API 料金換算" }),
+      cell("セッション", h("div", { class: "v num", text: int(t.sessions.size) })),
+      cell("プロンプト", h("div", { class: "v num", text: int(t.prompts) })),
+      cell("PR", h("div", { class: "v num", text: int(t.prs) })),
+      cell("変更行", [
+        h("div", { class: "v num add", text: `+${int(t.linesAdded)}` }),
+        h("div", { class: "v num del", text: `−${int(t.linesRemoved)}` }),
+      ]),
+    );
+    fitValues();
+  }
+
+  const MAX_VALUE_PX = 18;
+  const MIN_VALUE_PX = 10;
+  function fitValues() {
+    for (const el of document.querySelectorAll(".totals .v")) {
+      let px = MAX_VALUE_PX;
+      el.style.fontSize = `${px}px`;
+      while (el.scrollWidth > el.clientWidth && px > MIN_VALUE_PX) {
+        px -= 1;
+        el.style.fontSize = `${px}px`;
+      }
+    }
+  }
+  window.addEventListener("resize", fitValues);
+
+  function renderProjects() {
+    const counts = new Map();
+    for (const e of lastEvents) {
+      if (!showSdk && isSdk(e)) continue;
+      const cwd = e.extendedProps.session.cwd;
+      counts.set(cwd, (counts.get(cwd) ?? 0) + 1);
+    }
+    document.getElementById("projects").replaceChildren(...[...counts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(([cwd, n]) => {
+        const input = h("input", { type: "checkbox" });
+        input.checked = !hidden.has(cwd);
+        input.addEventListener("change", () => {
+          input.checked ? hidden.delete(cwd) : hidden.add(cwd);
+          save(HIDDEN_KEY, [...hidden]);
+          calendar.refetchEvents();
+        });
+        const sw = h("span", { class: "swatch" });
+        sw.style.background = colorOf(cwd);
+        return h("li", { title: cwd }, h("label", {},
+          input, sw, h("span", { class: "name", text: projectLabel(cwd) }), h("span", { class: "count num", text: n })));
+      }));
+    document.getElementById("sdk-count").textContent = lastEvents.filter(isSdk).length;
+  }
+
+  function dailySummaries(events) {
+    const byDay = new Map();
+    for (const e of events) {
+      const k = dayKey(new Date(e.start));
+      if (!byDay.has(k)) byDay.set(k, []);
+      byDay.get(k).push(e);
+    }
+    return [...byDay.entries()].map(([day, evs]) => {
+      const from = new Date(`${day}T00:00:00`);
+      const to = new Date(from);
+      to.setDate(to.getDate() + 1);
+      const t = sum(evs, from.getTime(), to.getTime());
+      // Blocks that started the day before can still run into this day.
+      const active = sumMs(activeWithin(events, from.getTime(), to.getTime()));
+      const parts = [`稼働 ${hours(active)}`, usd(t.costUSD)];
+      if (t.prs) parts.push(`PR ${t.prs}`);
+      return {
+        id: `summary-${day}`,
+        title: parts.join(" · "),
+        start: day,
+        allDay: true,
+        classNames: ["summary-event"],
+        order: 0,
+        extendedProps: { summary: true, lines: parts },
+      };
+    });
+  }
+
+  function toCalendarEvents(events) {
+    const out = [];
+    for (const e of events) {
+      const base = { ...e, color: colorOf(e.extendedProps.session.cwd), order: 1 };
+      const active = e.extendedProps.block.active ?? [];
+      if (mode !== "active") {
+        out.push(base);
+      } else if (active.length === 0) {
+        out.push({ ...base, classNames: ["no-turns"] });
+      } else {
+        active.forEach((iv, i) => {
+          const start = new Date(iv.start);
+          const end = new Date(Math.max(new Date(iv.end).getTime(), start.getTime() + MIN_EVENT_MS));
+          out.push({ ...base, id: `${e.id}~${i}`, start, end });
+        });
+      }
+    }
+    return out;
+  }
+
+  const detail = document.getElementById("detail");
+  // A click anywhere on the calendar closes the pane; a click on another
+  // session's event is handled by eventClick, which switches the pane instead.
+  document.querySelector("main").addEventListener("click", (ev) => {
+    if (ev.target.closest(".fc-event:not(.summary-event)")) return;
+    detail.hidden = true;
+  });
+  detail.querySelector(".close").addEventListener("click", () => { detail.hidden = true; });
+  document.addEventListener("keydown", (ev) => {
+    if (ev.key !== "Escape") return;
+    if (!viewerEl.hidden) closeViewer();
+    else detail.hidden = true;
+  });
+
+  // Monaco is loaded on first use, with its web workers started from data:
+  // URLs because a worker script cannot be loaded from another origin directly.
+  const MONACO_BASE = "https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min";
+  // Pretty-printing a log this large takes long enough to freeze the page.
+  const PRETTY_MAX_BYTES = 15 * 1024 * 1024;
+  let monacoReady = null;
+  function loadMonaco() {
+    monacoReady ??= new Promise((resolve, reject) => {
+      window.MonacoEnvironment = {
+        getWorkerUrl: () => "data:text/javascript;charset=utf-8," + encodeURIComponent(
+          `self.MonacoEnvironment = { baseUrl: "${MONACO_BASE}/" }; importScripts("${MONACO_BASE}/vs/base/worker/workerMain.js");`),
+      };
+      const script = document.createElement("script");
+      script.src = `${MONACO_BASE}/vs/loader.js`;
+      script.onerror = () => { monacoReady = null; reject(new Error("Monaco を読み込めませんでした")); };
+      script.onload = () => {
+        window.require.config({ paths: { vs: `${MONACO_BASE}/vs` } });
+        window.require(["vs/editor/editor.main"], () => resolve(window.monaco), reject);
+      };
+      document.head.append(script);
+    });
+    return monacoReady;
+  }
+
+  const viewerEl = document.getElementById("viewer");
+  const viewerStatus = document.getElementById("viewer-status");
+  const viewerFile = document.getElementById("viewer-file");
+  const formatButtons = viewerEl.querySelectorAll("[data-format]");
+  let editor = null;
+  let viewer = null; // { session, startAt, text, format }
+
+  function closeViewer() {
+    viewerEl.hidden = true;
+    editor?.setModel(null);
+    viewer = null;
+  }
+  document.getElementById("viewer-close").addEventListener("click", closeViewer);
+  document.getElementById("viewer-fold").addEventListener("click", () => editor?.getAction("editor.foldLevel2")?.run());
+  formatButtons.forEach((b) => b.addEventListener("click", () => {
+    if (!viewer || viewer.format === b.dataset.format) return;
+    viewer.format = b.dataset.format;
+    renderLog();
+  }));
+  viewerFile.addEventListener("change", () => loadLog(viewerFile.value));
+
+  // Builds the text to show and the line of the first record at or after
+  // startAt. Pretty format wraps every record in one JSON array so each one
+  // can be folded; a line that is not JSON (one still being written) is kept
+  // as a string.
+  function layout(text, format, startAt) {
+    const lines = text.split("\n").filter((l) => l.trim() !== "");
+    const records = lines.map((l) => { try { return JSON.parse(l); } catch { return l; } });
+    const target = records.findIndex((r) => r?.timestamp && new Date(r.timestamp) >= startAt);
+    if (format === "raw") return { value: lines.join("\n"), line: target < 0 ? 1 : target + 1 };
+    const out = ["["];
+    let line = 1;
+    records.forEach((r, i) => {
+      if (i === target) line = out.length + 1;
+      const body = JSON.stringify(r, null, 2).split("\n").map((l) => "  " + l);
+      if (i < records.length - 1) body[body.length - 1] += ",";
+      out.push(...body);
+    });
+    out.push("]");
+    return { value: out.join("\n"), line };
+  }
+
+  async function renderLog() {
+    formatButtons.forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.format === viewer.format)));
+    viewerStatus.textContent = "表示を準備中…";
+    const monaco = await loadMonaco();
+    // Let the status paint before the synchronous layout work.
+    await new Promise((r) => setTimeout(r, 0));
+    const { value, line } = layout(viewer.text, viewer.format, viewer.startAt);
+    if (!editor) {
+      monaco.languages.json.jsonDefaults.setDiagnosticsOptions({ validate: false });
+      const dark = matchMedia("(prefers-color-scheme: dark)").matches;
+      editor = monaco.editor.create(document.getElementById("monaco"), {
+        readOnly: true,
+        automaticLayout: true,
+        theme: dark ? "vs-dark" : "vs",
+        fontSize: 12,
+        scrollBeyondLastLine: false,
+        foldingMaximumRegions: 20000,
+        renderValidationDecorations: "off",
+      });
+    }
+    editor.getModel()?.dispose();
+    editor.setModel(monaco.editor.createModel(value, "json"));
+    editor.setPosition({ lineNumber: line, column: 1 });
+    editor.revealLineNearTop(line);
+    viewerStatus.textContent = `${int(viewer.text.length)} 文字`;
+  }
+
+  async function loadLog(file) {
+    const { session } = viewer;
+    viewerStatus.textContent = "読み込み中…";
+    try {
+      const q = file ? `?${new URLSearchParams({ file })}` : "";
+      const res = await fetch(`/api/sessions/${encodeURIComponent(session.id)}/log${q}`);
+      if (!res.ok) throw new Error(await res.text());
+      viewer.text = await res.text();
+      viewer.format = viewer.text.length > PRETTY_MAX_BYTES ? "raw" : "pretty";
+      await renderLog();
+    } catch (err) {
+      viewerStatus.textContent = `読み込めませんでした: ${err.message}`;
+    }
+  }
+
+  function openViewer(session, startAt, title) {
+    viewer = { session, startAt, text: "", format: "pretty" };
+    document.getElementById("viewer-title").textContent = title || session.id;
+    viewerFile.replaceChildren(
+      h("option", { value: "", text: "セッション" }),
+      ...(session.subagents ?? []).map((n) => h("option", { value: n, text: `subagent: ${n}` })));
+    viewerFile.hidden = !session.subagents?.length;
+    viewerEl.hidden = false;
+    loadLog("");
+  }
+
+  function chips(map) {
+    const entries = sortedEntries(map);
+    if (!entries.length) return h("span", { class: "muted", text: "-" });
+    return h("div", { class: "chips" }, entries.map(([k, n]) => h("span", { class: "chip" }, k, h("span", { class: "n num", text: n }))));
+  }
+
+  function prList(prs) {
+    if (!prs?.length) return h("span", { class: "muted", text: "-" });
+    return h("div", {}, prs.map((p) => {
+      const label = `${p.repository}#${p.number}`;
+      const url = safeUrl(p.url);
+      return h("div", {}, url ? h("a", { href: url, target: "_blank", rel: "noopener noreferrer", text: label }) : label);
+    }));
+  }
+
+  function fileList(files, cwd) {
+    if (!files?.length) return h("span", { class: "muted", text: "-" });
+    const rel = (f) => (cwd && f.startsWith(cwd + "/") ? f.slice(cwd.length + 1) : f);
+    const li = (f) => h("li", { title: f, text: rel(f) });
+    const head = files.slice(0, FILES_SHOWN);
+    const rest = files.slice(FILES_SHOWN);
+    return h("div", {},
+      h("ul", { class: "files" }, head.map(li)),
+      rest.length ? h("details", {}, h("summary", { text: `ほか ${rest.length} 件` }), h("ul", { class: "files" }, rest.map(li))) : null);
+  }
+
+  function lines(added, removed) {
+    return h("span", { class: "num" }, h("span", { class: "add", text: `+${int(added)}` }), " ", h("span", { class: "del", text: `−${int(removed)}` }));
+  }
+
+  function usageTable(usage) {
+    const rows = Object.entries(usage ?? {});
+    if (!rows.length) return null;
+    return h("div", { class: "table-wrap" }, h("table", { class: "usage num" },
+      h("thead", {}, h("tr", {}, ["モデル", "入力", "出力", "キャッシュ読込", "キャッシュ作成", "コスト"].map((c) => h("th", { text: c })))),
+      h("tbody", {}, rows.map(([model, u]) => h("tr", {},
+        h("td", { text: model }), h("td", { text: int(u.inputTokens) }), h("td", { text: int(u.outputTokens) }),
+        h("td", { text: int(u.cacheReadInputTokens) }), h("td", { text: int(u.cacheCreationInputTokens) }),
+        h("td", { text: usd(u.costUSD) }))))));
+  }
+
+  function showDetail(ev) {
+    const { session: s, block: b } = ev.extendedProps;
+    const start = new Date(b.start);
+    const end = new Date(b.end);
+    const row = (k, v) => [h("dt", { text: k }), h("dd", {}, v)];
+    const cmd = (s.cwd ? `cd ${shellQuote(s.cwd)} && ` : "") + `claude --resume ${s.id}`;
+    const copy = h("button", { type: "button", text: "Copy" });
+    const openLog = h("button", { type: "button", class: "open-log", text: "ログを開く（このブロックの位置から）" });
+    openLog.addEventListener("click", () => openViewer(s, start, ev.title));
+    copy.addEventListener("click", async () => {
+      try { await navigator.clipboard.writeText(cmd); copy.textContent = "Copied"; } catch { copy.textContent = "Failed"; }
+    });
+
+    const blockRows = [
+      row("稼働", b.active?.length
+        ? h("span", {}, `${dur(b.activeMs)}（${b.active.length} 区間）`, est(b.activeEstimated))
+        : h("span", { class: "muted", text: "記録なし" })),
+      row("コスト", h("span", {}, usd(b.costUSD), est(s.costEstimated))),
+      b.tokens ? row("トークン", h("div", { class: "chips" }, Object.entries(b.tokens).map(([m, t]) =>
+        h("span", { class: "chip", title: `入力 ${int(t.input)} / 出力 ${int(t.output)} / キャッシュ読込 ${int(t.cacheRead)} / キャッシュ作成 ${int(t.cacheWrite5m + t.cacheWrite1h)}` },
+          m, h("span", { class: "n num", text: `出力 ${compact(t.output)} · 読込 ${compact(t.cacheRead)}` }))))) : null,
+      row("変更行", lines(b.linesAdded, b.linesRemoved)),
+      row("プロンプト", `${int(b.prompts)} / メッセージ ${int(b.messages)}`),
+      row("PR", prList(b.prs)),
+      row("モデル", chips(b.models)),
+      row("ツール", chips(b.tools)),
+      b.skills ? row("スキル", chips(b.skills)) : null,
+      b.mcp ? row("MCP", chips(b.mcp)) : null,
+      b.errors ? row("API エラー", String(b.errors)) : null,
+      row("編集ファイル", fileList(b.files, s.cwd)),
+    ];
+    const sessionTotals = [
+      row("ブロック", String(s.blocks)),
+      row("稼働", dur(s.activeMs)),
+      row("コスト", h("span", {}, usd(s.costUSD), est(s.costEstimated))),
+      row("変更行", lines(s.linesAdded, s.linesRemoved)),
+      row("PR", prList(s.prs)),
+    ];
+    const sessionMeta = [
+      row("Project", s.cwd || "-"),
+      row("Branch", s.branch || "-"),
+      row("起動元", s.entrypoint || "-"),
+      row("Version", s.version || "-"),
+      row("Session", s.slug ? `${s.id}（${s.slug}）` : s.id),
+      row("ログ", h("span", { title: s.path, text: s.path ? s.path.replace(/^.*\/projects\//, "…/projects/") : "-" })),
+    ];
+    // A session that was not split into several blocks is the block itself,
+    // so its totals would only repeat the block's figures.
+    const split = s.blocks > 1;
+    if (!split) openLog.textContent = "ログを開く";
+
+    document.getElementById("detail-body").replaceChildren(
+      h("h3", { text: ev.title || "(untitled)" }),
+      h("div", { class: "when", text: `${timeFmt.format(start)} – ${hmFmt.format(end)}（${dur(end - start)}）` }),
+      ...(split
+        ? [
+          h("h4", { text: "このブロック" }), h("dl", {}, blockRows),
+          h("h4", { text: "セッション全体" }), h("dl", {}, sessionTotals, sessionMeta),
+        ]
+        : [h("h4", { text: "セッション" }), h("dl", {}, blockRows, sessionMeta)]),
+      usageTable(s.usage),
+      h("div", { class: "cmd" }, h("code", { text: cmd }), copy),
+      openLog,
+    );
+    detail.hidden = false;
+  }
+
+  const modeButtons = document.querySelectorAll(".seg button");
+  function syncMode() {
+    modeButtons.forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.mode === mode)));
+  }
+  modeButtons.forEach((b) => b.addEventListener("click", () => {
+    mode = b.dataset.mode;
+    save(MODE_KEY, mode);
+    syncMode();
+    calendar.refetchEvents();
+  }));
+  syncMode();
+
+  const sdkToggle = document.getElementById("show-sdk");
+  sdkToggle.checked = showSdk;
+  sdkToggle.addEventListener("change", () => {
+    showSdk = sdkToggle.checked;
+    save(SHOW_SDK_KEY, showSdk);
+    calendar.refetchEvents();
+  });
+
+  const calendar = new FullCalendar.Calendar(document.getElementById("calendar"), {
+    locale: "ja",
+    initialView: "timeGridWeek",
+    headerToolbar: {
+      left: "prev,next today",
+      center: "title",
+      right: "dayGridMonth,timeGridWeek,timeGridDay,listWeek",
+    },
+    height: "100%",
+    firstDay: 1,
+    nowIndicator: true,
+    allDayText: "日計",
+    scrollTime: "08:00:00",
+    slotDuration: "00:30:00",
+    slotEventOverlap: false,
+    dayMaxEvents: 6,
+    eventOrder: "order,start,-duration",
+    eventTimeFormat: { hour: "2-digit", minute: "2-digit", hour12: false },
+    slotLabelFormat: { hour: "2-digit", minute: "2-digit", hour12: false },
+    events: async (info, success, failure) => {
+      try {
+        const q = new URLSearchParams({ start: info.startStr, end: info.endStr });
+        const res = await fetch(`/api/events?${q}`);
+        if (!res.ok) throw new Error(await res.text());
+        lastEvents = await res.json();
+        range = { start: info.start, end: info.end };
+        const shown = visible();
+        renderProjects();
+        renderTotals(shown);
+        success([...dailySummaries(shown), ...toCalendarEvents(shown)]);
+      } catch (err) {
+        failure(err);
+      }
+    },
+    eventContent: (arg) => {
+      if (!arg.event.extendedProps.summary) return true;
+      return { domNodes: arg.event.extendedProps.lines.map((l) => h("div", { text: l })) };
+    },
+    eventDidMount: (info) => {
+      const p = info.event.extendedProps;
+      if (p.summary) {
+        info.el.title = ACTIVE_HINT;
+        return;
+      }
+      const b = p.block;
+      info.el.title = [
+        info.event.title,
+        `${projectLabel(p.session.cwd)}${p.session.branch ? ` (${p.session.branch})` : ""}`,
+        `稼働 ${dur(b.activeMs)}${b.activeEstimated ? "（推定）" : ""} · ${usd(b.costUSD)} · プロンプト ${b.prompts}`,
+      ].join("\n");
+    },
+    eventClick: (info) => {
+      if (!info.event.extendedProps.summary) showDetail(info.event);
+    },
+  });
+  calendar.render();
+  setInterval(() => calendar.refetchEvents(), REFRESH_MS);
+})();
+</script>
+</body>
+</html>

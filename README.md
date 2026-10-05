@@ -2,7 +2,6 @@
 
 [![go](https://github.com/sters/ai-working-calendar/workflows/Go/badge.svg)](https://github.com/sters/ai-working-calendar/actions?query=workflow%3AGo)
 [![coverage](docs/coverage.svg)](https://github.com/sters/ai-working-calendar)
-[![go-report](https://goreportcard.com/badge/github.com/sters/ai-working-calendar)](https://goreportcard.com/report/github.com/sters/ai-working-calendar)
 
 A localhost-only web tool that reads Claude Code session logs (`~/.claude/projects/*/*.jsonl`) and shows the time you spent working as a calendar.
 

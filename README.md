@@ -3,6 +3,11 @@
 [![go](https://github.com/sters/ai-working-calendar/workflows/Go/badge.svg)](https://github.com/sters/ai-working-calendar/actions?query=workflow%3AGo)
 [![coverage](docs/coverage.svg)](https://github.com/sters/ai-working-calendar)
 
+> [!NOTE]
+> This tool is no longer maintained. The same calendar is now part of
+> [ai-session-archive](https://github.com/sters/ai-session-archive) (`bunx github:sters/ai-session-archive web`, then
+> open `/calendar`), which also keeps sessions whose logs Claude Code has already deleted.
+
 A localhost-only web tool that reads Claude Code session logs (`~/.claude/projects/*/*.jsonl`) and shows the time you spent working as a calendar.
 
 ![Week view of AI Working Calendar](docs/screenshot.png)
